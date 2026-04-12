@@ -1,0 +1,38 @@
+# DAeCS VM Python Requirements
+# Consolidated from all DAeCS sub-app requirements.
+# Installed during VM provision (provision.sh).
+# Root requirements.txt (selenium, moviepy, etc.) deliberately excluded.
+
+# ── DAeCS Orchestrator ──────────────────────────────────────────────────────
+textual>=0.80.0
+psutil>=5.9.0
+
+# ── FastAPI stack (UWMD, UOPS, ASCS) ────────────────────────────────────────
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+sqlalchemy>=2.0.25
+pydantic>=2.5.3
+pydantic-settings>=2.1.0
+jinja2>=3.1.3
+python-multipart>=0.0.6
+sse-starlette>=1.8.2
+python-dotenv>=1.0.0
+requests>=2.31.0
+httpx>=0.26.0
+aiofiles>=23.2.1
+python-dateutil>=2.8.2
+
+# ── UOPS extras ─────────────────────────────────────────────────────────────
+PyMuPDF>=1.23.0
+Pillow>=10.0.0
+
+# ── ACGS (Flask) ────────────────────────────────────────────────────────────
+flask>=3.0
+flask-sqlalchemy>=3.1
+openpyxl>=3.1
+groq>=0.4
+piexif>=1.1.3
+numpy>=1.24
+
+# ── Dev / Testing ────────────────────────────────────────────────────────────
+pytest

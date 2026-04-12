@@ -1,0 +1,8 @@
+# Default: Windows CRLF
+* text=auto
+
+# Bash scripts must keep LF
+*.sh text eol=lf
+
+# Vagrantfile (Ruby) keep LF
+Vagrantfile text eol=lf

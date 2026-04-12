@@ -1,0 +1,12 @@
+# Vagrant instance state (per-instance .vagrant folders)
+instances/
+
+# Packaged boxes (large binary files)
+*.box
+
+# Vagrant temp files
+.vagrant/
+
+# OS
+Thumbs.db
+.DS_Store
