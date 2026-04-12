@@ -10,7 +10,9 @@ VAGRANTFILE_API_VERSION = "2"
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   # ─── Base Box ───────────────────────────────────────────────────────────────
-  config.vm.box = "ubuntu/jammy64"   # Ubuntu 22.04 LTS
+  # Pre-provisioned box: Ubuntu 22.04 + XFCE + xrdp + Python 3.13 + Windsurf
+  # Build: vagrant package --output windsurf-base.box && vagrant box add windsurf-base windsurf-base.box
+  config.vm.box = "windsurf-base"
   config.vm.box_check_update = false
 
   # ─── Instance Identity (set by vm.ps1 via env vars) ─────────────────────────
