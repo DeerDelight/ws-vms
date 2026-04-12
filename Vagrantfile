@@ -9,16 +9,18 @@ VAGRANTFILE_API_VERSION = "2"
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
-  # ─── Base Box ───────────────────────────────────────────────────────────────
-  # Pre-provisioned box: Ubuntu 22.04 + XFCE + xrdp + Python 3.13 + Windsurf
-  # Build: vagrant package --output windsurf-base.box && vagrant box add windsurf-base windsurf-base.box
-  config.vm.box = "windsurf-base"
-  config.vm.box_check_update = false
-
-  # ─── Instance Identity (set by vm.ps1 via env vars) ─────────────────────────
+  # ─── Instance Identity + Resources (set by vm.ps1 via env vars) ──────────────
   instance_name = ENV["VM_INSTANCE_NAME"] || "default"
   rdp_port      = (ENV["VM_RDP_PORT"]     || "3390").to_i
-  project_path  = ENV["VM_PROJECT_PATH"]  || "C:/Users/email/Desktop/mkt_tools"
+  project_path  = ENV["VM_PROJECT_PATH"]  || Dir.home + "/Desktop/my-project"
+  vm_ram        = (ENV["VM_RAM"]          || "6144").to_i
+  vm_cpus       = (ENV["VM_CPUS"]         || "4").to_i
+
+  # ─── Base Box ───────────────────────────────────────────────────────────────
+  # vm.ps1 auto-selects: windsurf-base (if built, fast) or ubuntu/jammy64 (fresh)
+  # To build windsurf-base: see README.md > Building the Base Box
+  config.vm.box = ENV["VM_BOX"] || "ubuntu/jammy64"
+  config.vm.box_check_update = false
 
   config.vm.hostname = "windsurf-#{instance_name}"
 
@@ -48,8 +50,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   # ─── VirtualBox Provider ────────────────────────────────────────────────────
   config.vm.provider "virtualbox" do |vb|
     vb.name   = "windsurf-#{instance_name}"
-    vb.memory = 6144   # 6 GB — comfortable for Windsurf dev on 16GB host
-    vb.cpus   = 4
+    vb.memory = vm_ram
+    vb.cpus   = vm_cpus
 
     vb.gui = false     # Headless — access via RDP
 

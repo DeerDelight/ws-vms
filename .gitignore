@@ -10,6 +10,9 @@ instances/
 # Instance registry (machine-specific)
 .vm-registry.json
 
+# User config (machine-specific, contains personal paths)
+vm.config.ps1
+
 # OS
 Thumbs.db
 .DS_Store
