@@ -1,9 +1,0 @@
-﻿{
-    "instances":  {
-                      "dev-main":  {
-                                       "rdp_port":  3390,
-                                       "created":  "2026-04-12 14:10",
-                                       "status":  "stopped"
-                                   }
-                  }
-}

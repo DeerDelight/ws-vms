@@ -7,6 +7,9 @@ instances/
 # Vagrant temp files
 .vagrant/
 
+# Instance registry (machine-specific)
+.vm-registry.json
+
 # OS
 Thumbs.db
 .DS_Store
