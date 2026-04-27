@@ -2,7 +2,7 @@
 
 A minimal PowerShell CLI to spin up, manage, and snapshot isolated **Windsurf IDE** development environments on Windows using Vagrant + VirtualBox.
 
-Each VM runs **Ubuntu 22.04** with XFCE desktop, accessible via Remote Desktop (RDP). Your Windows project folder is shared into the VM as `/project` — edit files in the VM, run apps on Windows, no sync lag.
+Each VM runs **Ubuntu 22.04** with XFCE desktop, accessible via Remote Desktop (RDP). Your Windows project folders are live-synced into the VM as shared folders — either a single `/project` mount (legacy) or multiple `/projects/<name>` mounts (see [USAGE.md](./USAGE.md) for the multi-project workflow).
 
 ---
 
@@ -10,21 +10,24 @@ Each VM runs **Ubuntu 22.04** with XFCE desktop, accessible via Remote Desktop (
 
 - **One-command VM creation** — `vm new dev-main` provisions everything automatically
 - **Multi-instance** — run multiple named VMs, each with its own RDP port and snapshots
+- **Multi-project** — each VM can mount any subset of your project folders under `/projects/<name>` (see [USAGE.md](./USAGE.md))
 - **Snapshot workflow** — save/restore VM state in seconds (great for experiments)
-- **Shared folder** — your project files are live-synced via VirtualBox shared folder
+- **Shared folders** — project files are live-synced via VirtualBox shared folder
 - **Fast re-use** — optionally build a pre-provisioned base box (~1-2 min boot vs. ~15 min)
 - **Auto RDP** — `vm start` opens Remote Desktop automatically
 
 ### What's inside each VM
 
-| Component | Version |
-|-----------|---------|
-| OS | Ubuntu 22.04 LTS |
+| Component | Version / Source |
+|-----------|------------------|
+| OS | Ubuntu 22.04 LTS (**snap-free** — snapd purged and pinned) |
 | Desktop | XFCE4 (lightweight) |
 | Remote access | xrdp |
 | IDE | Windsurf (auto-launches on login) |
+| Browser | Google Chrome (direct `.deb` from Google) |
+| Vietnamese input | ibus + ibus-bamboo (direct `.deb` from GitHub releases) |
 | Python | 3.13 + pip |
-| Python packages | FastAPI, SQLAlchemy, Flask, Textual, Pillow, and more |
+| Python packages | See `vm-requirements.txt` (FastAPI, SQLAlchemy, Flask, Textual, Pillow, …) |
 
 ---
 
@@ -70,17 +73,36 @@ First-time setup
 Project folder path (default: C:\Users\You\Desktop\my-project): C:\Dev\myapp
 RAM in MB [6144]:
 CPU cores [4]:
+Disk size in GB [40]:
 Base RDP port [3390]:
 ```
 
 This creates `vm.config.ps1` (gitignored — stays on your machine):
 
 ```powershell
+# Legacy single-project fallback (used when -p is omitted and prompt is empty)
 $ProjectPath = "C:\Dev\myapp"
+
+# Named project aliases for multi-project VMs (add your own, or leave empty)
+$Projects = @{
+    "mkt-tools"    = "C:\Dev\mkt-tools"
+    "windsurf-vms" = "C:\Dev\windsurfv_vms"
+}
+
 $VmRam       = 6144
 $VmCpus      = 4
+$VmDiskGB    = 40
 $BaseRdpPort = 3390
 ```
+
+> `$VmDiskGB` resizes the VirtualBox primary disk **and** grows the guest
+> filesystem automatically (via `growpart` + `resize2fs` during provisioning).
+> Increase it before `vm new` if you expect to install large toolchains.
+>
+> **Note:** disk resize only applies when creating VMs from `ubuntu/jammy64`
+> (VDI format). Packaged `windsurf-base.box` uses VMDK which VirtualBox cannot
+> resize — to enlarge disks on VMs from a base box, rebuild the base box after
+> bumping `$VmDiskGB`.
 
 To change settings later, edit `vm.config.ps1` directly or delete it to re-run the prompt.
 
@@ -91,16 +113,22 @@ To use a template: copy `vm.config.example.ps1` → `vm.config.ps1` and fill in 
 ## Commands
 
 ```
-.\vm.bat new <name>               Create and provision a new VM
+.\vm.bat new <name> [-p spec]     Create a new VM (spec = comma-separated aliases or paths)
 .\vm.bat start <name>             Start VM + open Remote Desktop
 .\vm.bat stop <name>              Halt VM (state preserved)
-.\vm.bat list                     Show all instances with status
+.\vm.bat list                     Show all instances with status + projects
 .\vm.bat delete <name>            Permanently destroy a VM
 
 .\vm.bat snapshot <name> <label>  Save a named snapshot
 .\vm.bat restore <name> <label>   Restore VM to a snapshot
 .\vm.bat snapshots <name>         List snapshots for an instance
+
+.\vm.bat setup-host               One-time SSH bridge setup (auto-elevates)
+.\vm.bat ssh <name>               SSH into VM from host terminal
+.\vm.bat status <name>            Show connectivity + bridge health
 ```
+
+For every flag, prompt, and edge case with concrete examples, see **[USAGE.md](./USAGE.md)**.
 
 You can also call `vm.ps1` directly from PowerShell:
 
@@ -111,8 +139,11 @@ powershell -ExecutionPolicy Bypass -File .\vm.ps1 start dev-main
 ### Example workflow
 
 ```powershell
-# Create VM for a project
+# Create a single-project VM (press Enter at the project prompt)
 .\vm.bat new dev-main
+
+# Create a multi-project VM from aliases in vm.config.ps1
+.\vm.bat new dev-main -p mkt-tools,windsurf-vms
 
 # Take a clean snapshot before installing something risky
 .\vm.bat snapshot dev-main before-experiment
@@ -183,10 +214,71 @@ After this, `vm new` will automatically use `windsurf-base` for all new instance
 
 ---
 
+## Remote-SSH Bridge (VM → Host)
+
+The bridge lets Windsurf inside the VM act as a **thin UI client** — all code execution, terminal, and file access happens on your Windows host. The VM is just a display.
+
+### How it works
+
+- VirtualBox **host-only network** (192.168.56.x) — private link, not reachable from internet/LAN
+- **OpenSSH Server** on host, listening only on the private adapter
+- **ed25519 key** (no passphrase) pre-installed in every VM
+- Windsurf's **Remote-SSH** auto-connects on launch — zero prompts
+
+### Setup (one-time)
+
+```powershell
+# 1. Configure SSH server + firewall + keys (auto-elevates, ~2 min)
+.\vm.bat setup-host
+
+# 2. Create a VM (no -p needed — Windsurf accesses host via SSH)
+.\vm.bat new dev
+
+# 3. Start it
+.\vm.bat start dev
+```
+
+After RDP login, Windsurf opens and is already connected to your Windows host filesystem — all files visible, no shared folders needed.
+
+> **Note:** `-p` shared folders are optional. Only add them if you need Linux terminal access to project files inside the VM (e.g. `vm new dev -p mkt-tools`).
+
+### New commands
+
+```
+vm setup-host          One-time host SSH bridge setup (auto-elevates)
+vm ssh <name>          SSH into VM from host terminal
+vm status <name>       Show connectivity details + bridge health
+```
+
+### Security
+
+| Layer | Protection |
+|-------|------------|
+| Network | Host-only adapter (no route to internet/LAN) |
+| DHCP | Disabled (static IPs only) |
+| SSH | Listens only on 192.168.56.1 |
+| Auth | ed25519 key only (no password) |
+| Firewall | TCP/22 allowed only from 192.168.56.0/24 |
+| Host key | Pre-pinned in VM (no TOFU prompts) |
+
+### Rebuilding existing VMs
+
+VMs created before `setup-host` don't have the host-only NIC. Recreate them:
+
+```powershell
+.\vm.bat delete dev-main
+.\vm.bat new dev-main -p mkt-tools
+```
+
+---
+
 ## Troubleshooting
 
 **`vm new` hangs for a very long time during apt-get update**
 > The default Ubuntu mirror can be slow in some regions. The provision script auto-switches to a regional mirror — if it's still slow, SSH into the VM and change `/etc/apt/sources.list` manually.
+
+**Provision fails partway through — do I have to `vm delete` and start over?**
+> No. `vm new <name>` now detects a previous `error` state and automatically re-runs `vagrant up --provision`. All provision steps are idempotent. Full Vagrant output is also saved to `instances/<name>/last-run.log` for inspection.
 
 **Guest Additions version mismatch warning**
 > Safe to ignore. The `/project` shared folder still works correctly.
